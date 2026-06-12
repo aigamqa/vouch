@@ -1,12 +1,14 @@
+import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { MobileShell } from '@/components/shared/MobileShell'
 import { Button } from '@/components/shared/Button'
 import { useTask } from '@/features/tasks/api'
+import { supabase } from '@/lib/supabase'
 
 const TONE_BG: Record<string, string> = {
   supportive: '#D4F0E0', playful: '#FFF2CC', hardcore: '#FFE4E1',
 }
-
 const STATUS_LABEL: Record<string, { text: string; color: string; bg: string }> = {
   pending:      { text: 'Waiting for Guardian', color: '#6B7C9F', bg: '#E8EEFA' },
   submitted:    { text: 'Awaiting verdict',     color: '#92400E', bg: '#FFF2CC' },
@@ -18,14 +20,34 @@ const STATUS_LABEL: Record<string, { text: string; color: string; bg: string }> 
 export default function TaskDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const { data: task, isLoading, error } = useTask(id ?? '')
+
+  // ── Realtime: watch for Guardian verdict ─────────────────────
+  useEffect(() => {
+    if (!id) return
+    const channel = supabase
+      .channel(`task-${id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tasks', filter: `id=eq.${id}` },
+        (payload) => {
+          const status = (payload.new as { status: string }).status
+          qc.invalidateQueries({ queryKey: ['task', id] })
+          qc.invalidateQueries({ queryKey: ['tasks'] })
+          if (status === 'approved') navigate(`/app/tasks/${id}/approved`, { replace: true })
+          if (status === 'rejected') navigate(`/app/tasks/${id}/rejected`, { replace: true })
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [id, navigate, qc])
 
   if (isLoading) return (
     <div className="min-h-screen flex items-center justify-center">
       <p className="text-[#6B7C9F] animate-pulse">Loading…</p>
     </div>
   )
-
   if (error || !task) return (
     <div className="min-h-screen flex items-center justify-center px-6">
       <div className="text-center">
@@ -49,7 +71,6 @@ export default function TaskDetail() {
   return (
     <MobileShell>
       <div className="flex flex-col flex-1">
-        {/* Header */}
         <div className="px-6 pt-14 pb-8 flex flex-col gap-4" style={{ background: TONE_BG[tone] }}>
           <button onClick={() => navigate('/app')} className="text-[#6B7C9F] text-sm flex items-center gap-1 w-fit">
             ← Dashboard
@@ -71,10 +92,7 @@ export default function TaskDetail() {
           </div>
         </div>
 
-        {/* Body */}
         <div className="px-6 pt-6 pb-10 flex flex-col gap-5 flex-1">
-
-          {/* Status card */}
           <div className="rounded-2xl border border-[#E8EEFA] bg-white p-4 flex items-center justify-between">
             <div>
               <p className="text-xs text-[#6B7C9F] font-medium mb-1">Status</p>
@@ -86,7 +104,16 @@ export default function TaskDetail() {
             </span>
           </div>
 
-          {/* Guardian opened evidence */}
+          {task.status === 'submitted' && (
+            <div className="rounded-2xl bg-[#FFF2CC] px-4 py-3 flex items-center gap-3">
+              <span className="text-xl">⏳</span>
+              <div>
+                <p className="text-sm font-semibold text-[#92400E]">Waiting for {guardianName}'s verdict</p>
+                <p className="text-xs text-[#92400E] opacity-70 mt-0.5">You'll be notified automatically</p>
+              </div>
+            </div>
+          )}
+
           {task.status === 'submitted' && task.guardian_seen_at && (
             <div className="rounded-2xl bg-[#D4F0E0] px-4 py-3 flex items-center gap-3">
               <span className="text-xl">👀</span>
@@ -94,7 +121,6 @@ export default function TaskDetail() {
             </div>
           )}
 
-          {/* Evidence preview (if submitted) */}
           {task.evidence_url && (
             <div className="rounded-2xl border border-[#E8EEFA] overflow-hidden">
               {task.evidence_url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
@@ -108,7 +134,6 @@ export default function TaskDetail() {
             </div>
           )}
 
-          {/* Guardian note (if rejected) */}
           {task.status === 'rejected' && task.guardian_note && (
             <div className="rounded-2xl bg-[#FFE4E1] px-4 py-4 flex flex-col gap-2">
               <p className="text-xs font-bold text-[#991B1B] uppercase tracking-wide">Guardian's note</p>
@@ -116,7 +141,6 @@ export default function TaskDetail() {
             </div>
           )}
 
-          {/* Approved celebration */}
           {task.status === 'approved' && (
             <div className="rounded-2xl bg-[#D4F0E0] px-4 py-4 flex items-center gap-3">
               <span className="text-3xl">🏆</span>
@@ -127,22 +151,13 @@ export default function TaskDetail() {
             </div>
           )}
 
-          {/* Actions */}
           <div className="mt-auto flex flex-col gap-3">
             {(task.status === 'pending' || task.status === 'submitted') && (
               <Button onClick={() => navigate(`/app/tasks/${task.id}/upload`)}>
                 {task.status === 'submitted' ? 'Update evidence 📸' : 'Upload evidence 📸'}
               </Button>
             )}
-
-            {task.status === 'pending' && !task.evidence_url && (
-              <div className="rounded-2xl border border-dashed border-[#E8EEFA] px-4 py-3 text-center">
-                <p className="text-xs text-[#B0BCCF]">Waiting for Guardian to accept…</p>
-                <p className="text-xs text-[#B0BCCF] mt-0.5">Shared the link yet?</p>
-              </div>
-            )}
-
-            {(task.status === 'rejected') && (
+            {task.status === 'rejected' && (
               <Button onClick={() => navigate(`/app/tasks/${task.id}/upload`)}>
                 Try again — upload new evidence
               </Button>
