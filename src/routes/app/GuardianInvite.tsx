@@ -6,13 +6,22 @@ export default function GuardianInvite() {
   const navigate = useNavigate()
   const raw = sessionStorage.getItem('vouch_task')
   const task = raw ? JSON.parse(raw) : { title: 'Your task', deadline: '' }
+  const invite_token = sessionStorage.getItem('vouch_invite_token')
 
   const deadline = task.deadline
     ? new Date(task.deadline).toLocaleString('en', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '—'
 
+  const shareUrl = invite_token
+    ? `https://vouch-sepia.vercel.app/g/${invite_token}`
+    : null
+
   function share() {
-    const text = `Hey! Can you be my Guardian for this task?\n\n"${task.title}"\nDeadline: ${deadline}\n\nhttps://getvouch.fyi/g/mock-token`
+    if (!shareUrl) {
+      alert('Invite token not found — please recreate the task.')
+      return
+    }
+    const text = `Hey! Can you be my Guardian for this task?\n\n"${task.title}"\nDeadline: ${deadline}\n\n${shareUrl}`
     if (navigator.share) {
       navigator.share({ title: 'Vouch — be my Guardian', text }).catch(() => {})
     } else {
@@ -20,6 +29,12 @@ export default function GuardianInvite() {
       alert('Link copied to clipboard!')
     }
     navigate('/app/tasks/waiting')
+  }
+
+  function copyLink() {
+    if (!shareUrl) return
+    navigator.clipboard.writeText(shareUrl)
+    alert('Link copied!')
   }
 
   return (
@@ -37,7 +52,7 @@ export default function GuardianInvite() {
         </p>
 
         {/* Share card preview */}
-        <div className="rounded-2xl border border-[#E8EEFA] bg-white p-5 flex flex-col gap-3 mb-8">
+        <div className="rounded-2xl border border-[#E8EEFA] bg-white p-5 flex flex-col gap-3 mb-4">
           <p className="text-[10px] font-bold text-[#B0BCCF] uppercase tracking-widest">
             Share card preview
           </p>
@@ -55,6 +70,17 @@ export default function GuardianInvite() {
             </span>
           )}
         </div>
+
+        {/* Copy link row */}
+        {shareUrl && (
+          <button
+            onClick={copyLink}
+            className="w-full rounded-2xl border border-[#E8EEFA] bg-[#F7F8FA] px-4 py-3 flex items-center justify-between mb-6 active:bg-[#E8EEFA] transition-colors"
+          >
+            <span className="text-xs text-[#6B7C9F] truncate max-w-[260px]">{shareUrl}</span>
+            <span className="text-xs font-bold text-[#FF5E5B] ml-2">Copy</span>
+          </button>
+        )}
 
         <div className="mt-auto">
           <Button onClick={share}>

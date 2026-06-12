@@ -1,35 +1,56 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { MobileShell } from '@/components/shared/MobileShell'
 import { Button } from '@/components/shared/Button'
-
-const MOCK_TASKS: Record<string, {
-  id: string; title: string; guardian: string; deadline: string;
-  status: string; tone: string; stake: string | null;
-}> = {
-  '1': { id: '1', title: 'Ship the auth module', guardian: 'Jess', deadline: '2025-05-31T21:00:00', status: 'pending', tone: 'supportive', stake: null },
-  '2': { id: '2', title: 'Run 5km before Sunday', guardian: 'Anna', deadline: '2025-06-01T09:00:00', status: 'submitted', tone: 'playful', stake: 'Potato Avatar' },
-  '3': { id: '3', title: 'Read 30 pages tonight', guardian: 'Kai', deadline: '2025-05-28T23:00:00', status: 'pending', tone: 'hardcore', stake: 'LinkedIn post' },
-}
+import { useTask } from '@/features/tasks/api'
 
 const TONE_BG: Record<string, string> = {
   supportive: '#D4F0E0', playful: '#FFF2CC', hardcore: '#FFE4E1',
 }
 
+const STATUS_LABEL: Record<string, { text: string; color: string; bg: string }> = {
+  pending:      { text: 'Waiting for Guardian', color: '#6B7C9F', bg: '#E8EEFA' },
+  submitted:    { text: 'Awaiting verdict',     color: '#92400E', bg: '#FFF2CC' },
+  approved:     { text: 'Approved ✓',           color: '#166534', bg: '#D4F0E0' },
+  rejected:     { text: 'Rejected',             color: '#991B1B', bg: '#FFE4E1' },
+  ghost_failed: { text: 'Ghost failed',         color: '#6B7C9F', bg: '#E8EEFA' },
+}
+
 export default function TaskDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const task = MOCK_TASKS[id ?? ''] ?? MOCK_TASKS['1']
+  const { data: task, isLoading, error } = useTask(id ?? '')
+
+  if (isLoading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <p className="text-[#6B7C9F] animate-pulse">Loading…</p>
+    </div>
+  )
+
+  if (error || !task) return (
+    <div className="min-h-screen flex items-center justify-center px-6">
+      <div className="text-center">
+        <p className="text-4xl mb-4">🔍</p>
+        <p className="font-bold text-[#0F1B3C]">Task not found</p>
+        <button onClick={() => navigate('/app')} className="text-sm text-[#FF5E5B] mt-3">← Dashboard</button>
+      </div>
+    </div>
+  )
 
   const deadline = new Date(task.deadline).toLocaleString('en', {
     weekday: 'short', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
   const isOverdue = new Date(task.deadline) < new Date()
+  const tone = task.tone ?? 'supportive'
+  const status = STATUS_LABEL[task.status] ?? STATUS_LABEL.pending
+  const guardianName = task.guardian?.display_name ?? 'Guardian'
+  const stakeName = task.stake?.name ?? null
 
   return (
     <MobileShell>
       <div className="flex flex-col flex-1">
-        <div className="px-6 pt-14 pb-8 flex flex-col gap-4" style={{ background: TONE_BG[task.tone] }}>
+        {/* Header */}
+        <div className="px-6 pt-14 pb-8 flex flex-col gap-4" style={{ background: TONE_BG[tone] }}>
           <button onClick={() => navigate('/app')} className="text-[#6B7C9F] text-sm flex items-center gap-1 w-fit">
             ← Dashboard
           </button>
@@ -37,51 +58,95 @@ export default function TaskDetail() {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5">
               <div className="w-5 h-5 rounded-full bg-[#FF5E5B] flex items-center justify-center">
-                <span className="text-white text-[10px] font-bold">{task.guardian[0]}</span>
+                <span className="text-white text-[10px] font-bold">{guardianName[0]}</span>
               </div>
-              <span className="text-xs font-semibold text-[#0F1B3C]">{task.guardian}</span>
+              <span className="text-xs font-semibold text-[#0F1B3C]">{guardianName}</span>
             </div>
             <span className="text-xs font-semibold" style={{ color: isOverdue ? '#991B1B' : '#6B7C9F' }}>
               {isOverdue ? '⚠️ Overdue' : `⏰ ${deadline}`}
             </span>
-            {task.stake && (
-              <span className="text-xs font-bold bg-white text-[#991B1B] rounded-full px-3 py-1">🔥 {task.stake}</span>
+            {stakeName && (
+              <span className="text-xs font-bold bg-white text-[#991B1B] rounded-full px-3 py-1">🔥 {stakeName}</span>
             )}
           </div>
         </div>
 
+        {/* Body */}
         <div className="px-6 pt-6 pb-10 flex flex-col gap-5 flex-1">
+
+          {/* Status card */}
           <div className="rounded-2xl border border-[#E8EEFA] bg-white p-4 flex items-center justify-between">
             <div>
               <p className="text-xs text-[#6B7C9F] font-medium mb-1">Status</p>
               <p className="font-bold text-[#0F1B3C] capitalize">{task.status.replace('_', ' ')}</p>
             </div>
-            {task.status === 'submitted' && (
-              <span className="text-xs font-bold bg-[#FFF2CC] text-[#92400E] rounded-full px-3 py-1">⏳ Awaiting verdict</span>
-            )}
-            {task.status === 'pending' && (
-              <span className="text-xs font-bold bg-[#E8EEFA] text-[#6B7C9F] rounded-full px-3 py-1">Waiting for Guardian</span>
-            )}
+            <span className="text-xs font-bold rounded-full px-3 py-1"
+              style={{ color: status.color, background: status.bg }}>
+              {status.text}
+            </span>
           </div>
 
-          {task.status === 'submitted' && (
+          {/* Guardian opened evidence */}
+          {task.status === 'submitted' && task.guardian_seen_at && (
             <div className="rounded-2xl bg-[#D4F0E0] px-4 py-3 flex items-center gap-3">
               <span className="text-xl">👀</span>
-              <p className="text-sm font-semibold text-[#166534]">{task.guardian} opened your evidence</p>
+              <p className="text-sm font-semibold text-[#166534]">{guardianName} opened your evidence</p>
             </div>
           )}
 
+          {/* Evidence preview (if submitted) */}
+          {task.evidence_url && (
+            <div className="rounded-2xl border border-[#E8EEFA] overflow-hidden">
+              {task.evidence_url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                <img src={task.evidence_url} alt="Your evidence" className="w-full object-cover max-h-52" />
+              ) : (
+                <a href={task.evidence_url} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-3 px-4 py-4 bg-[#F7F8FA] text-[#FF5E5B] font-semibold text-sm">
+                  🔗 View evidence link
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* Guardian note (if rejected) */}
+          {task.status === 'rejected' && task.guardian_note && (
+            <div className="rounded-2xl bg-[#FFE4E1] px-4 py-4 flex flex-col gap-2">
+              <p className="text-xs font-bold text-[#991B1B] uppercase tracking-wide">Guardian's note</p>
+              <p className="text-sm text-[#0F1B3C]">"{task.guardian_note}"</p>
+            </div>
+          )}
+
+          {/* Approved celebration */}
+          {task.status === 'approved' && (
+            <div className="rounded-2xl bg-[#D4F0E0] px-4 py-4 flex items-center gap-3">
+              <span className="text-3xl">🏆</span>
+              <div>
+                <p className="font-bold text-[#166534]">Task approved!</p>
+                <p className="text-sm text-[#166534] opacity-80">{guardianName} confirmed you did it.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
           <div className="mt-auto flex flex-col gap-3">
             {(task.status === 'pending' || task.status === 'submitted') && (
               <Button onClick={() => navigate(`/app/tasks/${task.id}/upload`)}>
-                {task.status === 'submitted' ? 'Update evidence' : 'Upload evidence 📸'}
+                {task.status === 'submitted' ? 'Update evidence 📸' : 'Upload evidence 📸'}
               </Button>
             )}
-            <div className="flex gap-2">
-              <button onClick={() => navigate(`/app/tasks/${task.id}/approved`)} className="flex-1 h-11 rounded-full bg-[#D4F0E0] text-[#166634] text-sm font-bold">✓ Approved demo</button>
-              <button onClick={() => navigate(`/app/tasks/${task.id}/rejected`)} className="flex-1 h-11 rounded-full bg-[#FFE4E1] text-[#991B1B] text-sm font-bold">✗ Rejected demo</button>
-            </div>
-            <p className="text-center text-[10px] text-[#B0BCCF]">Demo buttons — remove before production</p>
+
+            {task.status === 'pending' && !task.evidence_url && (
+              <div className="rounded-2xl border border-dashed border-[#E8EEFA] px-4 py-3 text-center">
+                <p className="text-xs text-[#B0BCCF]">Waiting for Guardian to accept…</p>
+                <p className="text-xs text-[#B0BCCF] mt-0.5">Shared the link yet?</p>
+              </div>
+            )}
+
+            {(task.status === 'rejected') && (
+              <Button onClick={() => navigate(`/app/tasks/${task.id}/upload`)}>
+                Try again — upload new evidence
+              </Button>
+            )}
           </div>
         </div>
       </div>

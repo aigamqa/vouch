@@ -29,14 +29,19 @@ export default function Dashboard() {
 
   return (
     <MobileShell>
+      {/* Header */}
       <div className="px-6 pt-14 pb-4 flex items-center justify-between">
         <div>
           <p className="text-xs text-[#6B7C9F] font-medium">Good work,</p>
           <h1 className="font-display text-xl font-bold text-[#0F1B3C] capitalize">{name}</h1>
         </div>
-        <div className="w-10 h-10 rounded-full bg-[#D4F0E0] flex items-center justify-center">
+        <button
+          onClick={() => navigate('/app/settings')}
+          className="w-10 h-10 rounded-full bg-[#D4F0E0] flex items-center justify-center active:scale-95 transition-transform"
+          title="Settings"
+        >
           <span className="text-sm font-bold text-[#166534] uppercase">{name.charAt(0)}</span>
-        </div>
+        </button>
       </div>
 
       <div className="px-6 pb-3 flex items-center justify-between">
@@ -103,6 +108,7 @@ export default function Dashboard() {
         })}
       </div>
 
+      {/* FAB */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-[430px] px-6 pointer-events-none">
         <button
           onClick={() => navigate('/app/tasks/new')}

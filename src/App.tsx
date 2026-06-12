@@ -15,6 +15,7 @@ import NewTask from '@/routes/app/NewTask'
 import TaskDetail from '@/routes/app/TaskDetail'
 import Approved from '@/routes/app/Approved'
 import Rejected from '@/routes/app/Rejected'
+import Settings from '@/routes/app/Settings'
 import GuardianView from '@/routes/guardian/GuardianView'
 import GuardianInvite from '@/routes/app/GuardianInvite'
 import Waiting from '@/routes/app/Waiting'
@@ -35,12 +36,13 @@ export default function App() {
           <Route path="/onboarding/privacy" element={<Privacy />} />
           <Route path="/app" element={<Dashboard />} />
           <Route path="/app/tasks/new" element={<NewTask />} />
+          <Route path="/app/tasks/new/guardian" element={<GuardianInvite />} />
+          <Route path="/app/tasks/waiting" element={<Waiting />} />
           <Route path="/app/tasks/:id" element={<TaskDetail />} />
           <Route path="/app/tasks/:id/approved" element={<Approved />} />
           <Route path="/app/tasks/:id/rejected" element={<Rejected />} />
-          <Route path="/app/tasks/new/guardian" element={<GuardianInvite />} />
-          <Route path="/app/tasks/waiting" element={<Waiting />} />
           <Route path="/app/tasks/:id/upload" element={<Upload />} />
+          <Route path="/app/settings" element={<Settings />} />
           <Route path="/g/:invite_token" element={<GuardianView />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

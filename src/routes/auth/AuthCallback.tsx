@@ -2,23 +2,38 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 
+async function getDestination(userId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle()
+  // Profile exists → returning user → go to dashboard
+  // No profile → new user → complete onboarding
+  if (!error && data) return '/app'
+  return '/onboarding/welcome'
+}
+
 export default function AuthCallback() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Handle magic link click — Supabase puts tokens in the URL hash
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate('/onboarding/welcome', { replace: true })
+    async function handleCallback() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const dest = await getDestination(session.user.id)
+        navigate(dest, { replace: true })
         return
       }
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
           subscription.unsubscribe()
-          navigate('/onboarding/welcome', { replace: true })
+          const dest = await getDestination(session.user.id)
+          navigate(dest, { replace: true })
         }
       })
-    })
+    }
+    handleCallback()
   }, [navigate])
 
   return (
