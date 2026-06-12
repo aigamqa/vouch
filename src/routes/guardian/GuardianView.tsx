@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { MobileShell } from '@/components/shared/MobileShell'
 import { Button } from '@/components/shared/Button'
@@ -21,6 +21,7 @@ export default function GuardianView() {
   const [verdict, setVerdict] = useState<'approve' | 'reject' | null>(null)
   const [selectedNote, setSelectedNote] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const qc = useQueryClient()
 
   // Load task via invite_token
   const { data, isLoading, error } = useQuery({
@@ -143,9 +144,16 @@ export default function GuardianView() {
             : <img src={task.evidence_url} alt="Evidence"
                 className="w-full rounded-2xl object-cover h-52 mb-6" />
         ) : (
-          <div className="w-full rounded-2xl border-2 border-dashed border-[#E8EEFA] h-40 flex flex-col items-center justify-center gap-2 mb-6">
+          <div className="w-full rounded-2xl border-2 border-dashed border-[#E8EEFA] h-48 flex flex-col items-center justify-center gap-3 mb-6">
             <span className="text-3xl">⏳</span>
-            <p className="text-sm text-[#6B7C9F]">No evidence uploaded yet</p>
+            <p className="text-sm text-[#6B7C9F] font-semibold">No evidence uploaded yet</p>
+            <p className="text-xs text-[#B0BCCF] text-center px-4">Ask them to upload, then tap Refresh</p>
+            <button
+              onClick={() => qc.invalidateQueries({ queryKey: ['guardian-task', invite_token] })}
+              className="mt-1 px-5 py-2 rounded-full bg-[#E8EEFA] text-[#6B7C9F] text-sm font-bold active:scale-95 transition-transform"
+            >
+              ↻ Refresh
+            </button>
           </div>
         )}
         <div className="flex flex-col gap-3 mt-auto">
